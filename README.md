@@ -2,7 +2,7 @@
 
 A Claude Code skill that acts as a guardian for your skill setup. Built on the [AXI design principles](https://axi.md/) — token-efficient output, content-first behavior, contextual next-step disclosure, and structured errors.
 
-Before you install any skill, `skill-eye` learns your actual workflow and tells you honestly whether that skill will help you — or just clutter your setup.
+Before you install any skill, `skill-eye` learns your actual workflow and tells you honestly whether that skill will help you — or just clutter your setup. After an audit surfaces zombies, `--remove` cleans them out in one step. And when a new version ships, `--update` upgrades itself — no terminal knowledge required.
 
 ---
 
@@ -59,12 +59,16 @@ Or manually: copy the `skills/skill-eye/` directory into `~/.claude/skills/skill
 ## Usage
 
 ```
-/skill-eye                        Show installed skill count + usage (content-first)
-/skill-eye --help                 Same as above
-/skill-eye <skill-name>           Evaluate an installed skill by name
-/skill-eye <github-url>           Evaluate a skill from a raw GitHub URL
-/skill-eye <owner/repo>           Browse and evaluate skills in a GitHub repo
-/skill-eye <skill-name> --detailed  Expand with trigger analysis + tool gap breakdown
+/skill-eye                           Show installed skill count + usage (content-first)
+/skill-eye --help                    Same as above
+/skill-eye <skill-name>              Evaluate an installed skill by name
+/skill-eye <github-url>              Evaluate a skill from a raw GitHub URL
+/skill-eye <owner/repo>              Browse and evaluate skills in a GitHub repo
+/skill-eye <skill-name> --detailed   Expand with trigger analysis + tool gap breakdown
+/skill-eye --remove <skill-name>     Remove an installed skill cleanly
+/skill-eye --remove <skill-name> --force   Remove without confirmation prompt
+/skill-eye --update                  Check for and apply the latest version
+/skill-eye --update --force          Update without confirmation prompt
 ```
 
 **Examples:**
@@ -74,6 +78,9 @@ Or manually: copy the `skills/skill-eye/` directory into `~/.claude/skills/skill
 /skill-eye verify --detailed
 /skill-eye https://github.com/supabase/agent-skills/blob/main/skills/supabase/SKILL.md
 /skill-eye supabase/agent-skills
+/skill-eye --remove verify-old
+/skill-eye --remove caveman --force
+/skill-eye --update
 ```
 
 ---

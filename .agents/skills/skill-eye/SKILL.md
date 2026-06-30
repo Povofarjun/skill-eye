@@ -11,8 +11,9 @@ description: >
   Also use when the user says "what skills should I install", "recommend skills for me",
   "discover skills", "audit my skills", "which of my skills am I not using",
   "evaluate all skills in this repo", or "batch evaluate".
-argument-hint: "[--help] [--discover] [--audit] [--batch] [--detailed] <skill-name|github-url|owner/repo>"
+argument-hint: "[--help] [--discover] [--audit] [--batch] [--detailed] [--remove [--force]] [--update [--force]] <skill-name|github-url|owner/repo>"
 disable-model-invocation: true
+version: 0.1.1
 ---
 
 # skill-eye — The Skill Guardian
@@ -24,7 +25,7 @@ contextual next-step disclosure, structured errors, and intelligent truncation.
 
 ## Mode Detection Router
 
-Check `$ARGUMENTS` before anything else. Strip `--detailed` first (it's an expansion flag
+Check `$ARGUMENTS` before anything else. Strip `--detailed` and `--force` first (they are modifier flags
 that appends to any mode's output), then route on what remains:
 
 | Argument pattern | Route to |
@@ -33,6 +34,10 @@ that appends to any mode's output), then route on what remains:
 | `--discover` | Phase 5 — Discover Mode |
 | `--audit` | Phase 6 — Audit Mode |
 | `<repo> --batch` or `--batch <repo>` | Phase 7 — Batch Mode |
+| `--remove <name>` | Phase 8 — Remove Mode |
+| `--remove <name> --force` | Phase 8 — Remove Mode (skip confirmation) |
+| `--update` | Phase 9 — Self-Update Mode |
+| `--update --force` | Phase 9 — Self-Update (skip confirmation) |
 | anything else (skill name, URL, owner/repo) | Phases 1–4 — Standard Evaluation |
 
 ---
@@ -43,12 +48,27 @@ If `$ARGUMENTS` is empty OR equals `--help`, do NOT silently fail or dump a help
 Show live state first, then compact usage.
 
 Glob these paths to get real counts:
+- `~/.agents/skills/*/SKILL.md`
+- `./.agents/skills/*/SKILL.md`
 - `~/.claude/plugins/**/skills/*/SKILL.md`
 - `~/.claude/skills/*/SKILL.md`
 
+### Version Check (silent, non-blocking)
+
+Before producing Phase 0 output, silently attempt to fetch the remote version:
+```
+https://raw.githubusercontent.com/povofarjun/skill-eye/main/.claude-plugin/plugin.json
+```
+- Timeout: ~3 seconds. On any failure (network error, timeout, malformed JSON): skip entirely, produce no error output, continue to Phase 0 output as normal.
+- Parse the `version` field from the fetched JSON.
+- Read local version from this SKILL.md's own frontmatter `version:` field.
+- Compare as semver strings. If remote version is higher than local: set `update_available = true` and store `remote_version`.
+- If versions are equal or fetch failed: `update_available = false`.
+
 Output:
 ```
-skill-eye v1.1
+skill-eye v<version from frontmatter>
+[update: v<remote_version> available — run /skill-eye --update]   ← include only if update_available = true
 installed: <N> skills across <M> plugin directories
 [last eval: <name> · <verdict> · <N> days ago]   ← include only if found in ~/.claude/history.jsonl
 
@@ -56,13 +76,14 @@ usage: /skill-eye <skill-name|github-url|owner/repo> [--detailed]
        /skill-eye --discover          recommend skills for your workflow
        /skill-eye --audit             review all installed skills
        /skill-eye <owner>/<repo> --batch   evaluate every skill in a repo
+       /skill-eye --update            update to latest version
 
 next: /skill-eye --discover          find skills matched to your workflow
 next: /skill-eye --audit             check which installed skills you actually use
-next: /skill-eye <owner>/<repo>      evaluate skills from a GitHub repo
+next: /skill-eye --update            update skill-eye to latest version
 ```
 
-Use actual glob counts — never show placeholder text like `<N>`.
+Use actual glob counts — never show placeholder text like `<N>`. Use the actual version from the frontmatter `version:` field — never hardcode a version string.
 
 ---
 
@@ -73,7 +94,7 @@ Gather silently BEFORE asking anything. Run all three in parallel:
 1. Read `./CLAUDE.md` and `./.claude/CLAUDE.md` — extract tech stack, project type, conventions
 2. Read `~/.claude/history.jsonl` (last 40 lines) — parse `display` field; find recurring topics,
    slash commands used, question patterns
-3. Glob `~/.claude/plugins/**/skills/*/SKILL.md` + `~/.claude/skills/*/SKILL.md` — record names
+3. Glob `~/.agents/skills/*/SKILL.md` + `./.agents/skills/*/SKILL.md` + `~/.claude/plugins/**/skills/*/SKILL.md` + `~/.claude/skills/*/SKILL.md` — record names
    and descriptions of all installed skills (needed for redundancy check in Phase 3)
 
 Then ask ONLY what you still don't know. Always ask:
@@ -97,7 +118,7 @@ role / stack / daily_tasks[] / mcp_available[] / pain_points[] / typical_prompts
 Resolve `$ARGUMENTS` (strip `--detailed` flag first, then process the rest):
 
 **Named skill** (e.g. `code-review`):
-Glob `~/.claude/plugins/**/skills/<name>/SKILL.md` and `~/.claude/skills/<name>/SKILL.md`.
+Glob `~/.agents/skills/<name>/SKILL.md` and `./.agents/skills/<name>/SKILL.md` and `~/.claude/plugins/**/skills/<name>/SKILL.md` and `~/.claude/skills/<name>/SKILL.md`.
 If multiple matches, list all with their source paths and ask which.
 
 **GitHub URL** (e.g. `https://github.com/owner/repo/blob/main/skills/foo/SKILL.md`):
@@ -123,7 +144,9 @@ dependencies, and implicit assumptions about the user/project. That's enough to 
 If skill name not found anywhere:
 ```
 skill-eye: 0 results for "<name>"
-searched: ~/.claude/plugins/**/skills/<name>/SKILL.md
+searched: ~/.agents/skills/<name>/SKILL.md
+          ./.agents/skills/<name>/SKILL.md
+          ~/.claude/plugins/**/skills/<name>/SKILL.md
           ~/.claude/skills/<name>/SKILL.md
 
 next: /skill-eye <github-url>    fetch SKILL.md directly from GitHub
@@ -382,6 +405,8 @@ Run Phase 1 (ambient context). This gives `installed_skills[]` and `typical_prom
 
 ### Step 2 — Score Every Installed Skill
 
+Scan `~/.agents/skills/*/SKILL.md` and `./.agents/skills/*/SKILL.md` first (npx-installed), then `~/.claude/skills/*/SKILL.md` and `~/.claude/plugins/**/skills/*/SKILL.md` (standalone and plugin-managed). Union all found skills.
+
 For each installed SKILL.md:
 1. Read description + first 30 lines of body
 2. Check history.jsonl: does the skill name, its slash command, or its trigger phrases
@@ -422,7 +447,7 @@ coverage gaps:
      try: /skill-eye --discover
   2. "<pattern>" → try: /skill-eye <known-skill-or-repo>
 ──────────────────────────────────────────────
-next: /skill-eye <zombie-name>           evaluate before removing
+next: /skill-eye --remove <zombie-name>  remove top zombie
 next: /skill-eye --audit --detailed      full per-skill breakdown
 next: /skill-eye --discover              find skills for the gaps above
 ```
@@ -437,6 +462,32 @@ When `--detailed` is present, append a full per-skill inventory table:
 <name>    fit: X.X  status: redundant with <name>  trigger: "<phrase>"
 ...
 ```
+
+### `--audit --prune` mode
+
+When `$ARGUMENTS` is `--audit --prune`:
+1. Run Phase 6 Steps 1–3 to identify all zombie skills
+2. Display the zombie list with paths before doing anything:
+   ```
+   skill-eye prune · <N> zombies found
+   ──────────────────────────────────────────────
+   <name>   <path>   last seen: never
+   <name>   <path>   last seen: <N> days ago
+   ──────────────────────────────────────────────
+   remove all <N>? (y/N)
+   ```
+3. On confirmation, iterate over each zombie in sequence:
+   - Run Phase 8 Steps 1–5 for that skill with `--force` implicitly set (the batch confirmation already collected consent — do not re-prompt per item)
+   - If a single item fails (npx error, directory missing, etc.), record the failure and continue to the next zombie — do not abort the whole batch
+   - Per-item output: one line per skill showing `ok` or `error: <reason>`
+4. Final report:
+   ```
+   skill-eye prune · done
+   removed: <N> skills · <M> manifest entries cleaned
+   failed:  <K> — <name> (<reason>), <name> (<reason>)   ← only if K > 0
+   ──────────────────────────────────────────────
+   next: /skill-eye --audit    verify remaining set
+   ```
 
 ---
 
@@ -496,4 +547,251 @@ next: /skill-eye --batch <other>/<repo>      batch evaluate another repo
 When `--detailed` is present, append a one-line reason after each table row:
 ```
   → <trigger mismatch | tool gap | task irrelevant | strong fit — specific reason>
+```
+
+---
+
+## Phase 8 — Remove Mode (`--remove <skill-name>`)
+
+**Purpose:** Remove an installed skill cleanly — regardless of how it was installed —
+without exposing any package manager complexity to the user.
+
+### Step 1 — Resolve Install Method
+
+Run these four globs IN PARALLEL to locate the skill (replace `<name>` with the argument):
+
+1. `~/.agents/skills/<name>/SKILL.md` → if found: type `npx-global`
+2. `./.agents/skills/<name>/SKILL.md` → if found: type `npx-project`
+3. `~/.claude/skills/<name>/SKILL.md` → if found: type `standalone`
+4. `~/.claude/plugins/**/skills/<name>/SKILL.md` → if found: type `native-plugin`
+
+Also try case-insensitive glob if exact match finds nothing.
+
+**Zero matches:**
+```
+skill-eye: 0 results for "<name>"
+searched: ~/.agents/skills/<name>
+          ./.agents/skills/<name>
+          ~/.claude/skills/<name>
+          ~/.claude/plugins/**/skills/<name>
+
+next: /skill-eye --audit    scan all installed skills
+next: /skill-eye --list     see what's installed
+```
+
+**Multiple matches** (skill in more than one location): list all found paths with their type labels and ask: `which scope to remove from? (1/<N>)`
+
+**Resolution note:** If the skill directory contains only a SKILL.md with no parent directory that is the skill's own folder, target the parent directory for removal.
+
+### Step 2 — Pre-Remove Summary
+
+Show this before any destructive action:
+
+```
+skill-eye remove · <name> · <type: npx-global|npx-project|standalone|native-plugin>
+path:      <resolved-directory-path>
+last seen: <N> days ago | never | unknown
+install:   <type>
+──────────────────────────────────────────────
+<type-note>
+──────────────────────────────────────────────
+confirm? (y/N)
+```
+
+Type notes (one line each, shown in the block above):
+- `npx-global`: `removes from ~/.agents/skills/ and cleans .skills.json if present`
+- `npx-project`: `removes from ./.agents/skills/ and cleans .skills.json in current project`
+- `standalone`: `removes directory only — no package manager involved`
+- `native-plugin`: `⚠ managed by Claude Code's plugin system — deleting SKILL.md alone may leave the plugin broken. Recommended: remove via Claude Code plugin manager instead.`
+
+For `native-plugin`, ask `continue anyway? (y/N)` rather than proceeding.
+
+Skip the confirmation prompt and proceed directly if `--force` was passed.
+
+### Step 3 — Execute Removal
+
+On user confirmation (or `--force`), run the appropriate path. Surface any non-zero exit code immediately as a structured error — never silently continue.
+
+**npx availability check (npx-global and npx-project only):**
+Before running any `npx` command, verify `npx` is available. Use the platform-appropriate check:
+- Bash/zsh: `command -v npx 2>/dev/null`
+- PowerShell: `Get-Command npx -ErrorAction SilentlyContinue`
+
+If absent:
+```
+skill-eye: error — npx not found
+detail: this skill was installed via npx skills; removal requires npx (bundled with Node.js ≥18)
+next: install Node.js from https://nodejs.org, then retry /skill-eye --remove <name>
+      or manually: rm -rf ~/.agents/skills/<name>/
+```
+Do not proceed to the npx command. Offer the manual `rm -rf` path as an escape hatch.
+
+**npx-global:**
+```bash
+npx -y skills remove <name> --global --yes 2>&1
+```
+After this command exits, verify the directory `~/.agents/skills/<name>/` no longer exists. If it still exists, report error.
+
+**npx-project:**
+```bash
+npx -y skills remove <name> --yes 2>&1
+```
+After this command exits, verify `./.agents/skills/<name>/` no longer exists.
+
+**standalone:**
+```bash
+rm -rf ~/.claude/skills/<name>/
+```
+On Windows via PowerShell: `Remove-Item -Recurse -Force "$env:USERPROFILE\.claude\skills\<name>"`
+
+**native-plugin (if user confirmed):**
+Delete the skill's own directory — NOT its parent (which is the plugin's shared `skills/` container and holds sibling skills):
+```bash
+rm -rf <resolved-skill-directory>/
+```
+On Windows: `Remove-Item -Recurse -Force "<resolved-skill-directory>"`
+
+The `<resolved-skill-directory>` is the directory containing the SKILL.md (e.g. `.../plugins/foo/skills/<name>/`), never its parent.
+Add a follow-up warning: `verify plugin state in Claude Code — a partial removal may cause errors.`
+
+**Error format** (any step):
+```
+skill-eye: error — <what failed>
+detail: <specific reason or exit code>
+next: <one corrective command>
+```
+
+### Step 4 — Lockfile Cleanup (npx installs only)
+
+Skip this step for standalone and native-plugin installs.
+
+For `npx-global`, search `~/` and `~/.agents/` for `.skills.json` and `skills-lock.json`.
+For `npx-project`, search `./` for `.skills.json` and `skills-lock.json`.
+
+**For each `.skills.json` found:**
+1. Read and parse it. If malformed JSON: output `manifest: .skills.json malformed — skipped` and continue.
+2. Check for the skill name as a key. First try exact match `"<name>"`. If not found, suffix-scan all keys ending with `"/<name>"` (the `remove` command receives only `<name>`, not `<owner>`). If multiple suffix matches exist, list them and ask which to remove.
+3. If found: delete that key, write the file back. Never delete the entire file.
+4. If not found: no action needed.
+
+**For each `skills-lock.json` found:**
+1. Read and parse it. If malformed JSON: output `manifest: skills-lock.json malformed — skipped` and continue.
+2. Find and delete the skill's entry. First try exact match `"<name>"`; then suffix-scan for keys ending with `"/<name>"`. Same multi-match disambiguation as .skills.json above.
+3. Write the file back. Never run `npx skills install` or `npx skills experimental_install` to regenerate — this would reinstall other skills.
+
+### Step 5 — Report
+
+```
+skill-eye remove · <name> · done
+removed: <path>
+manifest: .skills.json cleaned · skills-lock.json cleaned
+          | manifest: none found (standalone install)
+          | manifest: .skills.json malformed — skipped
+──────────────────────────────────────────────
+next: /skill-eye --audit         verify your skill set is clean
+next: /skill-eye --remove <other>   remove another skill
+```
+
+Only report `manifest: <file> cleaned` if the file was actually found and modified. Do not claim cleaned if the entry was absent or the file did not exist.
+
+---
+
+## Phase 9 — Self-Update Mode (`--update`)
+
+**Purpose:** Check whether a newer version of skill-eye is available on GitHub and apply the
+update transparently — no package manager knowledge required.
+
+### Step 1 — Check Remote Version
+
+Fetch:
+```
+https://raw.githubusercontent.com/povofarjun/skill-eye/main/.claude-plugin/plugin.json
+```
+
+Parse the `version` field. Read local version from this SKILL.md's own frontmatter `version:` field.
+
+**If fetch fails:**
+```
+skill-eye: error — could not reach GitHub to check for updates
+detail: check your network connection
+next: /skill-eye --update          retry when online
+next: /skill-eye                   continue without updating
+```
+
+**If remote version == local version:**
+```
+skill-eye v<version> · already up to date
+
+next: /skill-eye --audit    audit your skill set
+next: /skill-eye            return to dashboard
+```
+Stop here — no further steps needed.
+
+### Step 2 — Detect Install Scope
+
+Glob:
+1. `~/.agents/skills/skill-eye/SKILL.md` → scope: `global` (pass `--global` to update command)
+2. `./.agents/skills/skill-eye/SKILL.md` → scope: `project` (no global flag)
+
+If not found in either location:
+```
+skill-eye: error — cannot locate own install path
+detail: skill-eye not found in ~/.agents/skills/ or ./.agents/skills/
+next: reinstall: npx skills add povofarjun/skill-eye
+```
+
+### Step 3 — Preview + Confirm
+
+```
+skill-eye update · v<local> → v<remote>
+path:    <install-path>
+scope:   <global|project>
+──────────────────────────────────────────────
+confirm? (y/N)
+```
+
+Skip the confirmation prompt if `--force` was passed.
+
+### Step 4 — Execute
+
+Check npx availability (platform-appropriate):
+- Bash/zsh: `command -v npx 2>/dev/null`
+- PowerShell: `Get-Command npx -ErrorAction SilentlyContinue`
+
+**If npx available:**
+```bash
+npx -y skills update skill-eye [--global if scope=global] --yes 2>&1
+```
+
+**If npx absent:**
+```
+skill-eye: error — npx not found
+detail: update requires npx (bundled with Node.js ≥18)
+next: install Node.js from https://nodejs.org, then retry /skill-eye --update
+      or reinstall manually: npx skills add povofarjun/skill-eye
+```
+
+Surface any non-zero exit code as a structured error — never silently continue.
+
+### Step 5 — Verify + Report
+
+After the update command exits, re-read the `version:` field from the local SKILL.md
+frontmatter at `<install-path>`. Compare to the remote version fetched in Step 1.
+
+**If versions match:**
+```
+skill-eye update · done
+v<old> → v<new>
+path:    <install-path>
+──────────────────────────────────────────────
+next: /skill-eye          see what's new
+next: /skill-eye --audit  audit your skill set
+```
+
+**If versions still differ after update exits 0:**
+```
+skill-eye: warning — update ran but version unchanged (<local> still installed)
+detail: the update command exited 0 but the local SKILL.md still shows v<local>
+next: npx -y skills add povofarjun/skill-eye   reinstall to force latest
+next: /skill-eye --update                       retry
 ```
