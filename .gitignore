@@ -1,0 +1,9 @@
+# Shell variable paths accidentally committed as directories
+${HOME}
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/

@@ -1,2 +1,0 @@
-{"timestamp":"2026-06-30T11:16:55-07:00","rating":6,"session_id":"b1c62c26-9d83-4d7c-b09c-4fc4fa52c94f","source":"implicit","sentiment_summary":"Satisfied enough to move forward with next task.","confidence":0.85}
-{"timestamp":"2026-06-30T11:43:45-07:00","rating":5,"session_id":"b1c62c26-9d83-4d7c-b09c-4fc4fa52c94f","source":"implicit","sentiment_summary":"Inference failed: Timeout after 15000ms","confidence":0.3}
