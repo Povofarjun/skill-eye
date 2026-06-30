@@ -1,7 +1,7 @@
 {
   "name": "skill-eye",
   "description": "Guardian that evaluates any Claude Code skill against your real workflow before you install it. Learns your actual day-to-day tasks, tears apart the candidate skill, and delivers a verdict: install as-is, modify then install, or skip — with specific changes to make.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "author": {
     "name": "povofarjun",
     "email": "arjunpansheria@gmail.com",
