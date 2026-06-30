@@ -13,7 +13,7 @@ description: >
   "evaluate all skills in this repo", or "batch evaluate".
 argument-hint: "[--help] [--discover] [--audit] [--batch] [--detailed] [--remove [--force]] [--update [--force]] <skill-name|github-url|owner/repo>"
 disable-model-invocation: true
-version: 0.2.0
+version: 0.2.1
 ---
 
 # skill-eye — The Skill Guardian
@@ -493,47 +493,70 @@ next: /skill-eye            return to dashboard
 ```
 Stop.
 
-**Step 2 — Scope:** Glob `~/.agents/skills/skill-eye/SKILL.md` → global. Not found:
+**Step 2 — Scope:** Glob in parallel to find all install locations:
+1. `~/.agents/skills/skill-eye/SKILL.md` → type: `npx-global`
+2. `~/.claude/skills/skill-eye/SKILL.md` → type: `standalone`
+
+If neither found:
 ```
 skill-eye: error — cannot locate own install path
 next: reinstall: npx skills add povofarjun/skill-eye
 ```
 
+Build `install_locations` list with all found paths and their types.
+
 **Step 3 — Confirm** (skip if force_mode = true):
 ```
 skill-eye update · v<local> → v<remote>
-path:  <install-path>
-scope: global
+──────────────────────────────────────────────
+<for each install_location>
+path:   <install-path>
+method: <npx (with file-write fallback) | direct file write>
+</for each>
 ──────────────────────────────────────────────
 confirm? (y/N)
 ```
 
-**Step 4 — Execute:** Check npx (same check as Phase 8).
+**Step 4 — Execute:** For each install location in `install_locations`:
+
+*npx-global path:*
+Check npx (same check as Phase 8). If npx present:
 ```bash
 npx -y skills update skill-eye --global --yes 2>&1
 ```
-If npx absent:
+If npx absent OR npx exits non-zero → fall through to Step 4b (direct file write for this path), and note `method: direct write (npx unavailable)` in report.
+
+*standalone path OR fallback:* (Step 4b — Direct file write)
 ```
-skill-eye: error — npx not found
-detail: update requires npx (Node.js ≥18)
-next: reinstall: npx skills add povofarjun/skill-eye
+Fetch https://raw.githubusercontent.com/povofarjun/skill-eye/main/.agents/skills/skill-eye/SKILL.md
+Write content to <install-path>
+```
+If fetch fails:
+```
+skill-eye: error — could not fetch latest SKILL.md from GitHub
+detail: check your network connection
+next: /skill-eye --update    retry when online
 ```
 
 **Step 5 — Verify + report:**
-Re-read frontmatter `version:` at install path.
+For each updated path, re-read frontmatter `version:`.
 
-Versions match:
+All paths updated:
 ```
 skill-eye update · done
 v<old> → v<new>
-path: <install-path>
+──────────────────────────────────────────────
+<for each install_location>
+path:   <install-path>
+method: <npx | direct write | direct write (npx unavailable)>
+</for each>
 ──────────────────────────────────────────────
 next: /skill-eye          see what's new
 next: /skill-eye --audit  audit your skill set
 ```
 
-Versions still differ:
+Any path still at old version after update attempt:
 ```
-skill-eye: warning — update ran but version unchanged (<local> still installed)
+skill-eye: warning — <path> still at v<old>
 next: npx -y skills add povofarjun/skill-eye   reinstall to force latest
 ```
