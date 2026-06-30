@@ -8,7 +8,7 @@ description: >
   Use when the user says "should I install X skill", "is this skill worth it for me",
   "evaluate this skill", "review skill X", "check if Y skill fits my workflow",
   or pastes a SKILL.md URL or GitHub repo path to assess.
-argument-hint: [--help] [--detailed] <skill-name|github-url|owner/repo>
+argument-hint: "[--help] [--detailed] <skill-name|github-url|owner/repo>"
 disable-model-invocation: true
 ---
 
