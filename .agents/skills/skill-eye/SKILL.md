@@ -8,7 +8,10 @@ description: >
   Use when the user says "should I install X skill", "is this skill worth it for me",
   "evaluate this skill", "review skill X", "check if Y skill fits my workflow",
   or pastes a SKILL.md URL or GitHub repo path to assess.
-argument-hint: "[--help] [--detailed] <skill-name|github-url|owner/repo>"
+  Also use when the user says "what skills should I install", "recommend skills for me",
+  "discover skills", "audit my skills", "which of my skills am I not using",
+  "evaluate all skills in this repo", or "batch evaluate".
+argument-hint: "[--help] [--discover] [--audit] [--batch] [--detailed] <skill-name|github-url|owner/repo>"
 disable-model-invocation: true
 ---
 
@@ -16,6 +19,21 @@ disable-model-invocation: true
 
 Built on the AXI design principles (axi.md): token-efficient output, content-first behavior,
 contextual next-step disclosure, structured errors, and intelligent truncation.
+
+---
+
+## Mode Detection Router
+
+Check `$ARGUMENTS` before anything else. Strip `--detailed` first (it's an expansion flag
+that appends to any mode's output), then route on what remains:
+
+| Argument pattern | Route to |
+|-----------------|----------|
+| empty or `--help` | Phase 0 — Content-First |
+| `--discover` | Phase 5 — Discover Mode |
+| `--audit` | Phase 6 — Audit Mode |
+| `<repo> --batch` or `--batch <repo>` | Phase 7 — Batch Mode |
+| anything else (skill name, URL, owner/repo) | Phases 1–4 — Standard Evaluation |
 
 ---
 
@@ -30,14 +48,17 @@ Glob these paths to get real counts:
 
 Output:
 ```
-skill-eye v1.0
+skill-eye v1.1
 installed: <N> skills across <M> plugin directories
 [last eval: <name> · <verdict> · <N> days ago]   ← include only if found in ~/.claude/history.jsonl
 
 usage: /skill-eye <skill-name|github-url|owner/repo> [--detailed]
+       /skill-eye --discover          recommend skills for your workflow
+       /skill-eye --audit             review all installed skills
+       /skill-eye <owner>/<repo> --batch   evaluate every skill in a repo
 
-next: /skill-eye code-review         evaluate the installed code-review skill
-next: /skill-eye verify              evaluate the installed verify skill
+next: /skill-eye --discover          find skills matched to your workflow
+next: /skill-eye --audit             check which installed skills you actually use
 next: /skill-eye <owner>/<repo>      evaluate skills from a GitHub repo
 ```
 
@@ -243,8 +264,10 @@ next: /skill-eye <other-skill>              evaluate something else
 
 ## `--detailed` Flag (opt-in expansion)
 
-When `$ARGUMENTS` contains `--detailed`, append this section after the verdict + next lines:
+When `$ARGUMENTS` contains `--detailed`, append this section after the verdict + next lines.
+Works with all modes (standard evaluation, --discover, --audit, --batch).
 
+For standard evaluation:
 ```
 ── DETAILED BREAKDOWN ──────────────────────
 trigger_analysis:
@@ -285,3 +308,192 @@ trigger note: model-invoked — fires automatically when Claude detects context 
 
 **Very large SKILL.md (e.g. skill-creator at 33KB)**: truncation applies; note line counts;
 extract only what matters for evaluation — don't load the full file
+
+---
+
+## Phase 5 — Discover Mode (`--discover`)
+
+**Purpose:** The user doesn't know what skill to try next. Recommend best-fit skills from
+known sources, pre-scored against their actual workflow. Solves the cold-start problem.
+
+### Step 1 — Build User Profile
+Run Phase 1 (ambient context) silently. Ask the 2 standard questions if profile is unclear.
+
+### Step 2 — Scan Sources (parallel)
+
+1. **Already-installed skills not fully utilized**: Glob installed skills, identify any with
+   trigger alignment ≥ 6 against user profile that the user has never invoked (per history).
+   These are "hidden gems" — already available, never discovered.
+
+2. **Community repos** — fetch the GitHub API tree for each, find all SKILL.md files,
+   fetch only the first 20 lines (frontmatter only) to get name + description for scoring.
+   Skip files that match already-installed skills.
+
+   Repos to scan:
+   - `kunchenguid/axi` — `.agents/skills/`
+   - `multica-ai/andrej-karpathy-skills` — `skills/`
+   - `supabase/agent-skills` — `skills/`
+   - `Povofarjun/skill-eye` — `.agents/skills/`
+   - `anthropics/claude-code` — check for any `skills/` directories
+
+### Step 3 — Score and Rank
+Score each candidate on trigger alignment + task relevance only (2-dimension quick score).
+Skip: already installed AND appearing in recent history (user knows about it).
+Skip: fit < 3.0 (irrelevant noise).
+Sort descending. Show top 5 with verdict.
+
+### Step 4 — Output
+
+```
+skill-eye discover · profile: <role> · <stack>
+searched: <N> installed (hidden gems) + <M> community repos · <total> candidates
+──────────────────────────────────────────────
+rank  skill                 source                fit    verdict
+1     <name>                <owner/repo|local>    X.X    INSTALL AS-IS
+2     <name>                <owner/repo>          X.X    MODIFY THEN INSTALL
+3     <name>                <owner/repo>          X.X    INSTALL AS-IS
+──────────────────────────────────────────────
+next: /skill-eye <rank-1-name>              full evaluation of top pick
+next: /skill-eye <rank-2-name>             full evaluation of #2
+next: /skill-eye --discover --detailed     show all candidates + near-misses
+next: /skill-eye <owner>/<repo> --batch    explore a specific repo
+```
+
+### `--detailed` expansion for discover
+
+When `--detailed` is present, show all candidates including those below 3.0:
+```
+── ALL CANDIDATES ──────────────────────────
+near-misses (fit < 3.0 — skipped):
+  <name> (<source>) — fit: X.X — <one-line reason skipped>
+  ...
+```
+
+---
+
+## Phase 6 — Audit Mode (`--audit`)
+
+**Purpose:** Review ALL installed skills against the user's actual history. Surface zombies
+(install-and-forget), redundant pairs, and workflow gaps — without the user asking about
+each skill one by one.
+
+### Step 1 — Build User Profile
+Run Phase 1 (ambient context). This gives `installed_skills[]` and `typical_prompts[]`.
+
+### Step 2 — Score Every Installed Skill
+
+For each installed SKILL.md:
+1. Read description + first 30 lines of body
+2. Check history.jsonl: does the skill name, its slash command, or its trigger phrases
+   appear in the `display` field of any recent entry?
+3. Score trigger alignment against `typical_prompts` (rubric dimension 1)
+4. Score task relevance against `daily_tasks` (rubric dimension 3)
+5. Quick fit = (trigger + task) / 2
+
+Classify each skill:
+- `active`    — quick fit ≥ 6.0 OR appears in recent history
+- `dormant`   — quick fit 3.0–5.9 AND not in recent history
+- `zombie`    — quick fit < 3.0 AND not in history (install-and-forget)
+- `redundant` — trigger phrases overlap significantly with another installed skill
+
+### Step 3 — Find Coverage Gaps
+
+Scan `typical_prompts[]` for recurring task patterns with no installed skill match.
+Look for: verb + object pairs appearing 3+ times in history that no skill description covers.
+Report at most 3 gaps. For each, suggest a known skill or repo to fill it.
+
+### Step 4 — Output
+
+```
+skill-eye audit · <N> skills scanned · <date>
+profile: <role> · <stack>
+──────────────────────────────────────────────
+active (<N>):    <name> · <name> · <name>
+dormant (<N>):   <name> · <name>
+zombie (<N>):    <name> · <name> · <name>
+redundant (<N>): <name-a> ≈ <name-b>  (both trigger on "<phrase>")
+──────────────────────────────────────────────
+top removals:
+  1. <name> — <specific reason: never triggered / wrong domain / overlaps with X>
+  2. <name> — <specific reason>
+
+coverage gaps:
+  1. "<recurring prompt pattern>" → no installed skill handles this
+     try: /skill-eye --discover
+  2. "<pattern>" → try: /skill-eye <known-skill-or-repo>
+──────────────────────────────────────────────
+next: /skill-eye <zombie-name>           evaluate before removing
+next: /skill-eye --audit --detailed      full per-skill breakdown
+next: /skill-eye --discover              find skills for the gaps above
+```
+
+### `--detailed` expansion for audit
+
+When `--detailed` is present, append a full per-skill inventory table:
+```
+── FULL SKILL INVENTORY ────────────────────────
+<name>    fit: X.X  status: active    last seen: <N> days ago
+<name>    fit: X.X  status: zombie    last seen: never
+<name>    fit: X.X  status: redundant with <name>  trigger: "<phrase>"
+...
+```
+
+---
+
+## Phase 7 — Batch Mode (`<owner>/<repo> --batch`)
+
+**Purpose:** Evaluate ALL skills in a GitHub repo in one pass. No asking which one — score
+all of them and return a ranked table. For users browsing a repo and wanting a full picture
+before committing to individual evaluations.
+
+### Step 1 — Build User Profile
+Run Phase 1 (ambient context) silently. Ask standard questions only if profile is missing.
+
+### Step 2 — Discover All Skills in Repo
+
+Use GitHub API tree endpoint:
+`https://api.github.com/repos/<owner>/<repo>/git/trees/main?recursive=1`
+
+Find all SKILL.md files. Common paths:
+- `.agents/skills/*/SKILL.md`
+- `skills/*/SKILL.md`
+- `external_plugins/*/skills/*/SKILL.md`
+
+For each SKILL.md found, fetch only the first 25 lines (frontmatter + opening body lines).
+That's enough to score. Do NOT fetch full bodies.
+
+If 0 SKILL.md files found anywhere in the tree:
+```
+skill-eye: error — no skills found in <owner>/<repo>
+detail: checked .agents/skills/, skills/, external_plugins/ — 0 SKILL.md files
+next: /skill-eye <raw-url-to-SKILL.md>   evaluate a specific file directly
+```
+
+### Step 3 — Score All Skills (Quick 2D)
+
+Quick fit = (trigger alignment + task relevance) / 2 for each skill.
+Apply standard verdict thresholds to quick fit score.
+Sort descending by quick fit.
+
+### Step 4 — Output
+
+```
+skill-eye batch · <owner>/<repo> · <N> skills found
+profile: <role> · <stack>
+──────────────────────────────────────────────
+rank  skill                 fit    verdict              next
+1     <name>                X.X    INSTALL AS-IS        /skill-eye <name>
+2     <name>                X.X    MODIFY THEN INSTALL  /skill-eye <name>
+3     <name>                X.X    SKIP                 low fit
+──────────────────────────────────────────────
+next: /skill-eye <rank-1-name>               full evaluation of top pick
+next: /skill-eye <rank-2-name>               full evaluation of #2
+next: /skill-eye --batch <other>/<repo>      batch evaluate another repo
+```
+
+### `--detailed` expansion for batch
+
+When `--detailed` is present, append a one-line reason after each table row:
+```
+  → <trigger mismatch | tool gap | task irrelevant | strong fit — specific reason>
+```
