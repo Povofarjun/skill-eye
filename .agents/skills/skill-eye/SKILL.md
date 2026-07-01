@@ -16,7 +16,7 @@ description: >
   "evaluate all skills in this repo", or "batch evaluate".
 argument-hint: "[--help] [--discover] [--audit] [--batch] [--inspect <name>] [--detailed] [--remove [--force]] [--update [--force]] <skill-name|github-url|owner/repo>"
 disable-model-invocation: true
-version: 0.2.3
+version: 0.2.4
 ---
 
 # skill-eye — The Skill Guardian
@@ -602,91 +602,117 @@ Only report `cleaned` if file was found and modified. Never delete the parent pl
 
 ---
 
-## Phase 9 — Self-Update Mode (`--update`)
+## Phase 9 — Self-Update Mode (`--update [--force]`)
 
-**Step 1 — Remote version:** Fetch `https://raw.githubusercontent.com/povofarjun/skill-eye/main/.claude-plugin/plugin.json`. Parse `version`. Read local from frontmatter `version:`.
+How a Claude Code agent updates a skill: it fetches the new SKILL.md from GitHub using
+Bash curl, then uses the **Write tool** to overwrite each install path directly. No package
+manager is required. The Write tool is always available and is the only reliable write path.
 
-Fetch fails:
+**Step 1 — Remote version** (max 3s, skip-on-failure):
+
+Run Bash:
+```bash
+curl -fsSL "https://raw.githubusercontent.com/Povofarjun/skill-eye/main/.claude-plugin/plugin.json"
+```
+Parse `version` field → `remote_version`.
+Read `local_version` from this file's own frontmatter `version:` field.
+
+If curl exits non-zero or returns empty:
 ```
 skill-eye: error — could not reach GitHub
-detail: check your network connection
+detail: <curl error or empty response>
 next: <AGENT_PREFIX>skill-eye --update         retry when online
-next: <AGENT_PREFIX>skill-eye --update --force  force overwrite without version check
+next: <AGENT_PREFIX>skill-eye --update --force  skip version check and force overwrite
 ```
+Stop.
 
-Already up to date (skip this exit when `force_mode = true` — always proceed to Step 2):
+When `force_mode = false` AND `remote_version ≤ local_version`:
 ```
-skill-eye v<version> · already up to date
+skill-eye v<local_version> · already up to date
 
-next: <AGENT_PREFIX>skill-eye --audit          audit your skill set
-next: <AGENT_PREFIX>skill-eye                  return to dashboard
-next: <AGENT_PREFIX>skill-eye --update --force  force overwrite if you suspect a stale install
+next: <AGENT_PREFIX>skill-eye --update --force  overwrite anyway (clears stale installs)
+next: <AGENT_PREFIX>skill-eye --audit           audit your skill set
 ```
-Stop **only when `force_mode = false`**. When `force_mode = true`, continue to Step 2 regardless of version comparison.
+Stop. **When `force_mode = true`, skip this exit entirely — always continue to Step 2.**
 
-**Step 2 — Scope:** Glob in parallel to find all install locations:
-1. `~/.agents/skills/skill-eye/SKILL.md` → type: `npx-global`
-2. `./.agents/skills/skill-eye/SKILL.md` → type: `standalone`  (project-local)
-3. `~/.claude/skills/skill-eye/SKILL.md` → type: `standalone`  (claude)
-4. `~/<agent-home>/skills/skill-eye/SKILL.md` → type: `standalone`  (other agents — substitute real agent home, e.g. `~/.codex/` when AGENT = codex)
-
-If none found:
+**Step 2 — Locate install paths** (Glob all in parallel):
 ```
-skill-eye: error — cannot locate own install path
-next: reinstall: npx skills add povofarjun/skill-eye
+~/.agents/skills/skill-eye/SKILL.md
+./.agents/skills/skill-eye/SKILL.md
+~/.claude/skills/skill-eye/SKILL.md
+~/.claude/plugins/*/skills/skill-eye/SKILL.md
 ```
+Collect every path that resolves to an existing file. Store as `install_locations[]`.
 
-Build `install_locations` list with all found paths and their types.
-
-**Step 3 — Confirm** (skip if force_mode = true):
+Zero found:
 ```
-skill-eye update · v<local> → v<remote>
+skill-eye: error — cannot locate any install of skill-eye
+detail: searched ~/.agents/, ./.agents/, ~/.claude/skills/, ~/.claude/plugins/
+next: npx -y skills add Povofarjun/skill-eye    reinstall from scratch
+```
+Stop.
+
+**Step 3 — Confirm** (skip entirely when `force_mode = true`):
+```
+skill-eye update · v<local_version> → v<remote_version>
 ──────────────────────────────────────────────
-<for each install_location>
-path:   <install-path>
-method: <npx (with file-write fallback) | direct file write>
-</for each>
+<one line per install_location:>
+path: <path>
 ──────────────────────────────────────────────
 confirm? (y/N)
 ```
+On N or no response: stop with `cancelled.`
 
-**Step 4 — Execute:** For each install location in `install_locations`:
+**Step 4 — Fetch new SKILL.md**:
 
-*npx-global path:* Check npx (same check as Phase 8). If npx present: `npx -y skills update skill-eye --global --yes 2>&1`. If npx absent OR non-zero exit → fall through to Step 4b (direct file write for this path), and note `method: direct write (npx unavailable)`.
+Run Bash:
+```bash
+curl -fsSL "https://raw.githubusercontent.com/Povofarjun/skill-eye/main/.agents/skills/skill-eye/SKILL.md"
+```
+Store the full response body as `new_content`. Do **not** truncate or modify it.
 
-*standalone path OR fallback:* (Step 4b — Direct file write)
+If curl exits non-zero or returns empty:
 ```
-Fetch https://raw.githubusercontent.com/povofarjun/skill-eye/main/.agents/skills/skill-eye/SKILL.md
-Write content to <install-path>
-```
-If fetch fails:
-```
-skill-eye: error — could not fetch latest SKILL.md from GitHub
-detail: check your network connection
+skill-eye: error — could not download new SKILL.md
+detail: <curl error or empty response>
 next: <AGENT_PREFIX>skill-eye --update    retry when online
 ```
-Never call `npx skills install` — only `npx skills update`.
+Stop. Do not attempt writes with empty content.
 
-**Step 5 — Verify + report:** For each updated path, re-read frontmatter `version:`.
+**Step 5 — Write to each install path**:
 
-All paths updated:
+For each path in `install_locations`:
+- Use the **Write tool** to write `new_content` to the exact path.
+- Write tool replaces the file contents in full — no append, no merge.
+- If Write fails for a path: record `failed: <path> — <reason>` and continue to the next path.
+
+**Step 6 — Verify**:
+
+For each path written in Step 5:
+- Use the **Read tool** to read the first 20 lines of the file.
+- Check the `version:` line in the frontmatter.
+- If value = `remote_version` → mark ✓
+- If value ≠ `remote_version` → mark ✗ (write may have failed silently)
+
+**Report**:
 ```
 skill-eye update · done
-v<old> → v<new>
+v<local_version> → v<remote_version>
 ──────────────────────────────────────────────
-<for each install_location>
-path:   <install-path>
-method: <npx | direct write | direct write (npx unavailable)>
-</for each>
+<one line per install_location:>
+path:   <path>
+result: updated ✓  |  failed ✗ — <reason>
 ──────────────────────────────────────────────
+[warning: <N> path(s) still at old version — see above]   ← only if any ✗
 next: <AGENT_PREFIX>skill-eye          see what's new
 next: <AGENT_PREFIX>skill-eye --audit  audit your skill set
 ```
 
-Any path still at old version after update attempt:
+If every path shows ✗:
 ```
-skill-eye: warning — <path> still at v<old>
-next: npx -y skills add povofarjun/skill-eye   reinstall to force latest
+skill-eye: error — no paths updated successfully
+detail: Write tool may not have permission, or paths are read-only
+next: npx -y skills add Povofarjun/skill-eye   reinstall from scratch
 ```
 
 ---
