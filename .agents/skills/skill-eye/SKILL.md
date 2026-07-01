@@ -16,7 +16,7 @@ description: >
   "evaluate all skills in this repo", or "batch evaluate".
 argument-hint: "[--help] [--discover] [--audit] [--batch] [--inspect <name>] [--detailed] [--remove [--force]] [--update [--force]] <skill-name|github-url|owner/repo>"
 disable-model-invocation: true
-version: 0.3.0
+version: 0.2.2
 ---
 
 # skill-eye — The Skill Guardian
@@ -622,10 +622,11 @@ next: <AGENT_PREFIX>skill-eye            return to dashboard
 ```
 Stop.
 
-**Step 2 — Scope:** Glob active Path Resolution paths in parallel to find all install locations:
+**Step 2 — Scope:** Glob in parallel to find all install locations:
 1. `~/.agents/skills/skill-eye/SKILL.md` → type: `npx-global`
-2. `~/.claude/skills/skill-eye/SKILL.md` → type: `standalone`  (claude)
-3. `~/<agent-home>/skills/skill-eye/SKILL.md` → type: `standalone`  (other agents)
+2. `./.agents/skills/skill-eye/SKILL.md` → type: `standalone`  (project-local)
+3. `~/.claude/skills/skill-eye/SKILL.md` → type: `standalone`  (claude)
+4. `~/<agent-home>/skills/skill-eye/SKILL.md` → type: `standalone`  (other agents — substitute real agent home, e.g. `~/.codex/` when AGENT = codex)
 
 If none found:
 ```
