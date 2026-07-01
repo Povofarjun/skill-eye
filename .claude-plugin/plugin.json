@@ -1,13 +1,13 @@
 {
   "name": "skill-eye",
   "description": "Guardian that evaluates any Claude Code skill against your real workflow before you install it. Learns your actual day-to-day tasks, tears apart the candidate skill, and delivers a verdict: install as-is, modify then install, or skip — with specific changes to make.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
     "name": "povofarjun",
     "email": "arjunpansheria@gmail.com",
     "url": "https://github.com/povofarjun"
   },
-  "keywords": ["skills", "evaluation", "guardian", "audit", "remove", "workflow", "review"],
+  "keywords": ["skills", "evaluation", "guardian", "audit", "remove", "workflow", "review", "agent-agnostic", "inspect"],
   "homepage": "https://github.com/povofarjun/skill-eye",
   "license": "MIT"
 }
