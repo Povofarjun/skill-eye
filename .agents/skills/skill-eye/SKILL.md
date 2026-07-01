@@ -16,7 +16,7 @@ description: >
   "evaluate all skills in this repo", or "batch evaluate".
 argument-hint: "[--help] [--discover] [--audit] [--batch] [--inspect <name>] [--detailed] [--remove [--force]] [--update [--force]] <skill-name|github-url|owner/repo>"
 disable-model-invocation: true
-version: 0.2.2
+version: 0.2.3
 ---
 
 # skill-eye — The Skill Guardian
@@ -610,17 +610,19 @@ Fetch fails:
 ```
 skill-eye: error — could not reach GitHub
 detail: check your network connection
-next: <AGENT_PREFIX>skill-eye --update    retry when online
+next: <AGENT_PREFIX>skill-eye --update         retry when online
+next: <AGENT_PREFIX>skill-eye --update --force  force overwrite without version check
 ```
 
-Already up to date:
+Already up to date (skip this exit when `force_mode = true` — always proceed to Step 2):
 ```
 skill-eye v<version> · already up to date
 
-next: <AGENT_PREFIX>skill-eye --audit    audit your skill set
-next: <AGENT_PREFIX>skill-eye            return to dashboard
+next: <AGENT_PREFIX>skill-eye --audit          audit your skill set
+next: <AGENT_PREFIX>skill-eye                  return to dashboard
+next: <AGENT_PREFIX>skill-eye --update --force  force overwrite if you suspect a stale install
 ```
-Stop.
+Stop **only when `force_mode = false`**. When `force_mode = true`, continue to Step 2 regardless of version comparison.
 
 **Step 2 — Scope:** Glob in parallel to find all install locations:
 1. `~/.agents/skills/skill-eye/SKILL.md` → type: `npx-global`
