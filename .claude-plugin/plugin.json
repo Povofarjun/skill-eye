@@ -1,7 +1,7 @@
 {
   "name": "skill-eye",
-  "description": "Guardian that evaluates any Claude Code skill against your real workflow before you install it. Learns your actual day-to-day tasks, tears apart the candidate skill, and delivers a verdict: install as-is, modify then install, or skip — with specific changes to make.",
-  "version": "0.2.4",
+  "description": "Agent-agnostic skill guardian (claude, codex, opencode, pi, grok) that evaluates any AI agent skill against your real workflow before you install it, and monitors the health of the skills you already have. Learns your actual day-to-day tasks, tears apart the candidate skill, and delivers a verdict: install as-is, modify then install, or skip — with specific changes to make.",
+  "version": "0.2.5",
   "author": {
     "name": "povofarjun",
     "email": "arjunpansheria@gmail.com",

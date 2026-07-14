@@ -16,7 +16,7 @@ description: >
   "evaluate all skills in this repo", or "batch evaluate".
 argument-hint: "[--help] [--discover] [--audit] [--batch] [--inspect <name>] [--detailed] [--remove [--force]] [--update [--force]] <skill-name|github-url|owner/repo>"
 disable-model-invocation: true
-version: 0.2.4
+version: 0.2.5
 ---
 
 # skill-eye — The Skill Guardian
@@ -410,7 +410,7 @@ trigger note: model-invoked — fires on context match; trigger alignment scored
 **Step 2 — Scan in parallel:**
 1. Installed skills with trigger alignment ≥ 6 not in recent history → "hidden gems" (only meaningful when history available).
 2. Community repos — GitHub API tree, find SKILL.md files, fetch first 20 lines each:
-   - `kunchenguid/axi` · `multica-ai/andrej-karpathy-skills` · `supabase/agent-skills` · `Povofarjun/skill-eye` · `anthropics/claude-code`
+   - `kunchenguid/axi` · `multica-ai/andrej-karpathy-skills` · `supabase/agent-skills` · `povofarjun/skill-eye` · `anthropics/claude-code`
 
 **Step 3 — Score and rank:** Quick fit = (trigger alignment + task relevance) / 2. Skip fit < 3.0. Skip already installed AND in recent history. Show top 5.
 
@@ -612,7 +612,7 @@ manager is required. The Write tool is always available and is the only reliable
 
 Run Bash:
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/Povofarjun/skill-eye/main/.claude-plugin/plugin.json"
+curl -fsSL "https://raw.githubusercontent.com/povofarjun/skill-eye/main/.claude-plugin/plugin.json"
 ```
 Parse `version` field → `remote_version`.
 Read `local_version` from this file's own frontmatter `version:` field.
@@ -648,7 +648,7 @@ Zero found:
 ```
 skill-eye: error — cannot locate any install of skill-eye
 detail: searched ~/.agents/, ./.agents/, ~/.claude/skills/, ~/.claude/plugins/
-next: npx -y skills add Povofarjun/skill-eye    reinstall from scratch
+next: npx -y skills add povofarjun/skill-eye    reinstall from scratch
 ```
 Stop.
 
@@ -667,7 +667,7 @@ On N or no response: stop with `cancelled.`
 
 Run Bash:
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/Povofarjun/skill-eye/main/.agents/skills/skill-eye/SKILL.md"
+curl -fsSL "https://raw.githubusercontent.com/povofarjun/skill-eye/main/.agents/skills/skill-eye/SKILL.md"
 ```
 Store the full response body as `new_content`. Do **not** truncate or modify it.
 
@@ -712,7 +712,7 @@ If every path shows ✗:
 ```
 skill-eye: error — no paths updated successfully
 detail: Write tool may not have permission, or paths are read-only
-next: npx -y skills add Povofarjun/skill-eye   reinstall from scratch
+next: npx -y skills add povofarjun/skill-eye   reinstall from scratch
 ```
 
 ---

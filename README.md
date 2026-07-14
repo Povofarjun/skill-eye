@@ -1,8 +1,10 @@
 # skill-eye
 
-A Claude Code skill that acts as a guardian for your skill setup. Built on the [AXI design principles](https://axi.md/) — token-efficient output, content-first behavior, contextual next-step disclosure, and structured errors.
+A skill guardian for AI coding agents. Built on the [AXI design principles](https://axi.md/) — token-efficient output, content-first behavior, contextual next-step disclosure, and structured errors.
 
-Before you install any skill, `skill-eye` learns your actual workflow and tells you honestly whether that skill will help you — or just clutter your setup. After an audit surfaces zombies, `--remove` cleans them out in one step. And when a new version ships, `--update` upgrades itself — no terminal knowledge required.
+Before you install any skill, `skill-eye` learns your actual workflow and tells you honestly whether that skill will help you — or just clutter your setup. It also monitors the health of the skills you already have, finds the ones you never use, and cleans up or updates itself, all with no terminal knowledge required.
+
+**Agent-agnostic.** skill-eye detects which harness you're running — Claude Code, Codex, opencode, pi, or grok — and adapts its paths and invocation syntax automatically. The examples below use Claude Code's `/skill-eye` syntax; see [Supported Agents](#supported-agents) for the others.
 
 ---
 
@@ -44,6 +46,33 @@ next: cp ~/.claude/plugins/.../code-review/SKILL.md ~/.claude/skills/code-review
 next: /skill-eye verify                                                                       evaluate another
 ```
 
+Beyond one-off evaluation, `/skill-eye` with no arguments gives you a live health dashboard of everything installed:
+
+```
+skill-eye v0.2.5 [agent: claude]
+installed: 5 skills across 2 directories
+
+name              type    condition  last used    description
+──────────────────────────────────────────────────────────────
+code-review       user    healthy    2 days ago   review diffs for bugs and simplifications
+verify            user    healthy    5 days ago   exercise a change end-to-end before commit
+data-viz          model   healthy    never        chart/graph/dashboard design guidance
+old-linter        user    degraded   —            lints staged files (optional MCP missing)
+caveman           user    broken     30 days ago  writes commit messages in a dead style
+──────────────────────────────────────────────────────────────
+usage: /skill-eye <skill-name|github-url|owner/repo> [--detailed]
+       /skill-eye --inspect <name>   show skill anatomy
+       /skill-eye --discover          recommend skills for your workflow
+       /skill-eye --audit             review all installed skills
+       /skill-eye --update            update to latest version
+
+next: /skill-eye --discover    find skills matched to your workflow
+next: /skill-eye --audit       check which installed skills you actually use
+next: /skill-eye --inspect code-review   inspect a skill
+```
+
+Every skill is tagged with a **working-condition badge** — `healthy` (all required tools available), `degraded` (an optional tool referenced in the body is missing), or `broken` (a declared dependency is unavailable) — computed via static analysis, never by executing the skill.
+
 ---
 
 ## Install
@@ -52,23 +81,28 @@ next: /skill-eye verify                                                         
 npx skills add povofarjun/skill-eye
 ```
 
-Or manually: copy the `skills/skill-eye/` directory into `~/.claude/skills/skill-eye/`.
+Or manually: copy the `.agents/skills/skill-eye/` directory (including `references/`) into your agent's skills folder — `~/.claude/skills/skill-eye/` for Claude Code, `~/.codex/skills/skill-eye/` for Codex, and so on. See [Supported Agents](#supported-agents) for the full path per harness.
 
 ---
 
 ## Usage
 
 ```
-/skill-eye                           Show installed skill count + usage (content-first)
-/skill-eye --help                    Same as above
-/skill-eye <skill-name>              Evaluate an installed skill by name
-/skill-eye <github-url>              Evaluate a skill from a raw GitHub URL
-/skill-eye <owner/repo>              Browse and evaluate skills in a GitHub repo
-/skill-eye <skill-name> --detailed   Expand with trigger analysis + tool gap breakdown
-/skill-eye --remove <skill-name>     Remove an installed skill cleanly
+/skill-eye                                 Show installed skill health dashboard (content-first)
+/skill-eye --help                          Same as above
+/skill-eye <skill-name>                    Evaluate an installed skill by name
+/skill-eye <github-url>                    Evaluate a skill from a raw GitHub URL
+/skill-eye <owner/repo>                    Browse and evaluate skills in a GitHub repo
+/skill-eye <skill-name> --detailed         Expand with trigger analysis + tool gap breakdown
+/skill-eye --discover                      Recommend skills matched to your workflow
+/skill-eye --audit                         Classify every installed skill: active / dormant / zombie / redundant
+/skill-eye --audit --prune                 Audit, then remove all zombies after one confirmation
+/skill-eye --inspect <skill-name>          Show a skill's execution anatomy (tools, triggers, condition)
+/skill-eye <owner/repo> --batch            Evaluate every skill in a repo, ranked by fit
+/skill-eye --remove <skill-name>           Remove an installed skill cleanly
 /skill-eye --remove <skill-name> --force   Remove without confirmation prompt
-/skill-eye --update                  Check for and apply the latest version
-/skill-eye --update --force          Update without confirmation prompt
+/skill-eye --update                        Check for and apply the latest version
+/skill-eye --update --force                Update without confirmation prompt (also fixes stale installs)
 ```
 
 **Examples:**
@@ -78,10 +112,35 @@ Or manually: copy the `skills/skill-eye/` directory into `~/.claude/skills/skill
 /skill-eye verify --detailed
 /skill-eye https://github.com/supabase/agent-skills/blob/main/skills/supabase/SKILL.md
 /skill-eye supabase/agent-skills
+/skill-eye supabase/agent-skills --batch
+/skill-eye --discover
+/skill-eye --audit --prune
+/skill-eye --inspect code-review
 /skill-eye --remove verify-old
 /skill-eye --remove caveman --force
 /skill-eye --update
 ```
+
+Running under Codex? Same commands, `$` prefix: `$skill-eye --audit`, `$skill-eye --discover`, etc. — see below.
+
+---
+
+## Supported Agents
+
+skill-eye detects the running harness automatically (first match wins: `HARNESS` env var → Claude Code → Codex → opencode → pi → grok → `unknown`) and adapts its invocation prefix and skill-path resolution accordingly. No configuration needed.
+
+| Agent | Invocation prefix | Skill path |
+|-------|-------------------|------------|
+| Claude Code | `/skill-eye` | `~/.claude/skills/skill-eye/` or `~/.claude/plugins/*/skills/skill-eye/` |
+| Codex | `$skill-eye` | `~/.codex/skills/skill-eye/` |
+| opencode | `\skill-eye` | `~/.opencode/skills/skill-eye/` |
+| pi | `>skill-eye` | `~/.pi/skills/skill-eye/` |
+| grok | `~skill-eye` | `~/.grok/skills/skill-eye/` |
+| any other / unrecognized | `/skill-eye` | `~/.agents/skills/skill-eye/` (universal path, always checked) |
+
+`~/.agents/skills/` and `./.agents/skills/` (project-local) are always checked regardless of agent — this is where `npx skills add` installs by default.
+
+If your harness has no command history to learn from (only Claude Code's `~/.claude/history.jsonl` is read today), skill-eye degrades gracefully: it asks two direct profile questions instead of inferring from history, and every history-dependent output (last-used dates, "hidden gems" in `--discover`) shows a clean `—` instead of erroring.
 
 ---
 
@@ -110,7 +169,7 @@ skill-eye is built on all 10 [AXI design principles](https://axi.md/):
 | Definitive empty states | Explicit "0 results" with search paths shown |
 | Structured errors | `error: … / detail: … / next: …` format |
 | Ambient context | Reads CLAUDE.md + history silently before asking anything |
-| Content first | No-args shows live state, not a help wall |
+| Content first | No-args shows a live health dashboard, not a help wall |
 | Contextual disclosure | Every response ends with `next:` command lines |
 | Consistent `--help` | `/skill-eye --help` = `/skill-eye` = content-first response |
 
@@ -118,14 +177,14 @@ skill-eye is built on all 10 [AXI design principles](https://axi.md/):
 
 ## How it learns about you
 
-skill-eye reads:
-- **CLAUDE.md** in your current project (if it exists)
-- **~/.claude/history.jsonl** — your last 40 commands to infer patterns
+skill-eye reads, when available:
+- **CLAUDE.md** in your current project
+- **`~/.claude/history.jsonl`** (Claude Code only) — your last 40 commands, to infer patterns without asking
 
-It then asks 2–3 targeted questions to fill remaining gaps. All analysis happens locally in your Claude Code session — no data leaves your machine.
+It then asks 2–3 targeted questions to fill remaining gaps. skill-eye's only network calls are to GitHub, and only in these cases: every run of the no-args dashboard does a silent version check (capped at 3s, skipped on any failure); evaluating a skill by URL/name/repo, `--discover`, and `--batch` fetch the target skill's public source with no stated timeout; `--update` checks and downloads its own release with a 3s cap on the version check, but if that check or the download itself fails, it stops and shows you a structured error rather than failing silently. No data about your prompts, files, or profile is ever sent anywhere.
 
 ---
 
 ## License
 
-MIT © [povofarjun](https://github.com/povofarjun)
+MIT © [povofarjun](https://github.com/povofarjun) — see [LICENSE](LICENSE).
