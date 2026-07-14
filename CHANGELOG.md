@@ -2,6 +2,11 @@
 
 All notable changes to skill-eye are documented here.
 
+## 0.2.6 — 2026-07-14
+
+- Fixed: added explicit `allowed-tools: Bash, Read, Write, Edit, Glob, Grep` to SKILL.md frontmatter. Its absence meant the skill declared no tool boundary at all — automated security scanners (Snyk via `npx skills add`) flagged this as Critical Risk, since an agent-skill markdown file with unrestricted implicit tool access, `rm -rf`/`Remove-Item` destructive commands, and a self-overwriting `curl`+Write update mechanism is exactly the pattern those scanners are built to catch. The six tools listed are the actual, complete set the skill body uses — nothing was added or removed from its real behavior.
+- Docs: added a "Security & Permissions" section to README.md spelling out exactly what each destructive/network-capable mode does, so users can make an informed install decision instead of discovering it via a scanner warning.
+
 ## 0.2.5 — 2026-07-14
 
 - Fixed: GitHub username casing normalized to lowercase `povofarjun` throughout SKILL.md (mixed casing in `raw.githubusercontent.com` URLs used by `--update`).

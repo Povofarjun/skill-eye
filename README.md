@@ -49,7 +49,7 @@ next: /skill-eye verify                                                         
 Beyond one-off evaluation, `/skill-eye` with no arguments gives you a live health dashboard of everything installed:
 
 ```
-skill-eye v0.2.5 [agent: claude]
+skill-eye v0.2.6 [agent: claude]
 installed: 5 skills across 2 directories
 
 name              type    condition  last used    description
@@ -184,6 +184,19 @@ skill-eye reads, when available:
 It then asks 2–3 targeted questions to fill remaining gaps. skill-eye's only network calls are to GitHub, and only in these cases: every run of the no-args dashboard does a silent version check (capped at 3s, skipped on any failure); evaluating a skill by URL/name/repo, `--discover`, and `--batch` fetch the target skill's public source with no stated timeout; `--update` checks and downloads its own release with a 3s cap on the version check, but if that check or the download itself fails, it stops and shows you a structured error rather than failing silently. No data about your prompts, files, or profile is ever sent anywhere.
 
 ---
+
+## Security & Permissions
+
+skill-eye is a skill *manager* — it needs real system access to do its job, and you should know exactly what before installing it. Declared tools (`allowed-tools` in SKILL.md frontmatter): `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`. No MCP servers, no credentials, nothing beyond what's listed.
+
+What that access is used for, concretely:
+
+- **`--remove`** deletes skill directories (`rm -rf` / `Remove-Item -Recurse -Force`) and edits `.skills.json`/`skills-lock.json`. It always shows the exact path before deleting and asks for confirmation unless you pass `--force`.
+- **`--update`** fetches its own SKILL.md from `raw.githubusercontent.com/povofarjun/skill-eye` over HTTPS and overwrites your local install with the Write tool — no build step, no code execution, just a file replaced with the published Markdown. There's no cryptographic signature check beyond HTTPS/GitHub's own integrity guarantees; if you don't trust GitHub's transport, don't run `--update` and instead re-clone and diff manually.
+- **`--remove`/`--update`** shell out to `npx skills remove`/`npx -y skills add` for npx-managed installs — meaning it invokes the `npx skills` package manager on your behalf, scoped to the one skill you named.
+- Evaluating a skill (by name, URL, or repo), `--discover`, and `--batch` fetch **public** GitHub content (the target skill's own SKILL.md) — never your prompts, files, or profile.
+
+None of this runs unattended: every destructive action shows you the path/command first and asks `confirm? (y/N)` unless you explicitly pass `--force`. If you want zero-trust, read `.agents/skills/skill-eye/SKILL.md` yourself before installing — it's plain-English instructions to an agent, not compiled code, so there's nothing hidden that isn't in that file.
 
 ## Changelog
 

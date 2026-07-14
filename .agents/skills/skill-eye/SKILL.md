@@ -15,8 +15,9 @@ description: >
   "inspect skill X", "show skill anatomy", "is this skill working",
   "evaluate all skills in this repo", or "batch evaluate".
 argument-hint: "[--help] [--discover] [--audit] [--batch] [--inspect <name>] [--detailed] [--remove [--force]] [--update [--force]] <skill-name|github-url|owner/repo>"
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 disable-model-invocation: true
-version: 0.2.5
+version: 0.2.6
 ---
 
 # skill-eye — The Skill Guardian

@@ -4,7 +4,7 @@ project: skill-eye
 effort: E3
 effort_source: context-override
 phase: complete
-progress: 33/33
+progress: 40/40
 mode: algorithm
 started: 2026-07-14T00:00:00Z
 updated: 2026-07-14T00:05:00Z
@@ -378,6 +378,18 @@ Given two prior live failures on `--update` (2026-07-01, both rating 3/10 — se
 - [x] ISC-251: README.md links to `CHANGELOG.md`
 - [x] ISC-252: Anti: no secret, token, password, or private-key pattern found in full `git log -p` history (not just working tree)
 - [x] ISC-253: Anti: no personal filesystem path or internal IP found in full `git log -p` history
+
+### Security Scanner Risk — Root Cause & Fix (2026-07-14)
+
+User reported `npx skills add povofarjun/skill-eye` shows Snyk "High/Critical Risk" (reproduced live: Gen=Med, Socket=0-1 alerts, Snyk=Critical). Root cause: SKILL.md declared no `allowed-tools` frontmatter at all — combined with `rm -rf`/`Remove-Item` destructive delete instructions and a self-overwriting curl+Write update mechanism, an unscoped tool boundary is exactly the pattern these scanners flag hardest. skill-eye's own Working-Condition Check logic already treats a declared `allowed-tools` list as the trust signal for every *other* skill it audits; it wasn't applying that standard to itself.
+
+- [x] ISC-254: SKILL.md frontmatter declares `allowed-tools:` listing every tool the body actually uses, no more and no fewer
+- [x] ISC-255: Every tool named in `allowed-tools` is confirmed present in the body via Grep count (Bash, Read, Write, Edit, Glob, Grep each ≥1 occurrence outside the two enumeration lines)
+- [x] ISC-256: Anti: `allowed-tools` does not list WebFetch/WebSearch (body never invokes them directly — all network access routes through Bash+curl, confirmed by grep showing WebFetch/WebSearch only inside skill-eye's own tool-enumeration lines for auditing *other* skills)
+- [x] ISC-257: Declaring `allowed-tools` does not cause skill-eye's own Working-Condition Check to misclassify itself as degraded/broken (all 6 tools are in its own "standard, always available" list)
+- [x] ISC-258: README.md gains a "Security & Permissions" section naming the declared tools and explaining what each destructive/network mode does in plain language
+- [x] ISC-259: Version bumped 0.2.5 → 0.2.6 in both SKILL.md and plugin.json (frontmatter-only change, still needs to propagate via `--update`)
+- [x] ISC-260: Anti: no stale `v0.2.5` reference remains in README.md after the bump
 
 ## Test Strategy
 
