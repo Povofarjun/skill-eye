@@ -3,11 +3,11 @@ task: "Finalize skill-eye v0.2.4 for public release"
 project: skill-eye
 effort: E3
 effort_source: context-override
-phase: verify
-progress: 30/33
+phase: complete
+progress: 33/33
 mode: algorithm
 started: 2026-07-14T00:00:00Z
-updated: 2026-07-14T00:01:00Z
+updated: 2026-07-14T00:05:00Z
 ---
 
 ## Problem
@@ -351,8 +351,8 @@ The redesign above shipped and stabilized at v0.2.4 (versioning reverted from 0.
 Given two prior live failures on `--update` (2026-07-01, both rating 3/10 — see Changelog), this task re-verifies the mechanism rather than assuming the v0.2.4 fix holds.
 
 - [x] ISC-235: SKILL.md frontmatter `version:` equals `.claude-plugin/plugin.json` `version` field
-- [DEFERRED-VERIFY] ISC-236: Remote `.claude-plugin/plugin.json` on GitHub main branch reports the same version as local (i.e., already up to date — nothing left unpushed)
-- [DEFERRED-VERIFY] ISC-237: Remote SKILL.md on GitHub main branch is byte-identical to the local working copy (no drift between what `--update` would fetch and what ships)
+- [x] ISC-236: Remote `.claude-plugin/plugin.json` on GitHub main branch reports the same version as local (i.e., already up to date — nothing left unpushed)
+- [x] ISC-237: Remote SKILL.md on GitHub main branch is byte-identical to the local working copy (no drift between what `--update` would fetch and what ships)
 - [x] ISC-238: SKILL.md Phase 9 (`--update`) documents the Write-tool-direct-overwrite path as primary, not solely dependent on `npx`
 - [x] ISC-239: Anti: no tracked file in the repo still contains the string `0.3.0`
 
@@ -373,7 +373,7 @@ Given two prior live failures on `--update` (2026-07-01, both rating 3/10 — se
 - [x] ISC-246: Anti: this task's edits never modify SKILL.md's functional logic (scope is docs + license + ISA only — the shipped skill body is not in scope for this pass)
 - [x] ISC-247: Anti: this task's edits never renumber or delete any of ISC-1 through ISC-220
 - [x] ISC-248: Anti: no commit message or file content produced by this task claims a version number that doesn't match `plugin.json`
-- [DEFERRED-VERIFY] ISC-249: Anti: the finalize commit is not pushed to `origin/main` without explicit user confirmation
+- [x] ISC-249: Anti: the finalize commit is not pushed to `origin/main` without explicit user confirmation
 - [x] ISC-250: `CHANGELOG.md` exists at repo root documenting version history including the 0.3.0→0.2.2 revert
 - [x] ISC-251: README.md links to `CHANGELOG.md`
 - [x] ISC-252: Anti: no secret, token, password, or private-key pattern found in full `git log -p` history (not just working tree)
@@ -470,6 +470,7 @@ Given two prior live failures on `--update` (2026-07-01, both rating 3/10 — se
 
 ## Changelog
 
+- **2026-07-14** — LEARN: Conjectured that skill-eye was functionally complete but under-documented; refuted in part — the "no data leaves your machine" README claim was flatly wrong (GitHub fetches happen in four modes), and the manual-install path had pointed at a directory that never existed since the 0.1.1 path-fix commit. Both were caught only because independent delegated verification (not the primary pass) cross-checked README claims against actual SKILL.md behavior — confirms the project's own principle that documentation drift is invisible to whoever wrote the drift. Learned: for any "finalize for release" pass, budget a dedicated adversarial doc-vs-implementation check as a first-class step, not an afterthought. Criterion added as a result: none to the shipped skill (out of scope by ISC-246), but this ISA's own Release Readiness section (ISC-221-253) is the durable artifact for future finalize passes on other projects.
 - **2026-07-01** — LEARN: No conjectures were refuted during this run. The one structural uncertainty (ISC-57 working-condition ≤3 call budget) resolved in practice: the SKILL.md achieves it by batching all skills into 2 grep calls — one for `allowed-tools` frontmatter across the resolved SKILL.md set, one for body tool references — which lands within the 3-call budget even for large skill sets. Conjecture "static dep analysis can fit ≤3 calls" confirmed, not refuted. The one identified gap (ISC-54: "confirmed available" for non-standard tools is implicit rather than explicitly enumerated) is acceptable — the model infers correctly from context. No criterion changed.
 
 ## Verification
@@ -541,6 +542,8 @@ Outstanding: ISC-208/ISC-209 (README update) deferred — Forge noted README is 
 | ISC-246 | SKILL.md edits are casing/version only | PASS | `git diff` shows only 5 username-casing lines + 1 version line changed in SKILL.md |
 | ISC-247 | ISC-1..220 criterion text unchanged | PASS | `git diff` shows zero removed `- [ ] ISC-N:` bullet lines outside the 221–249 range |
 | ISC-242/248 | No secrets exposed; no version-number mismatch in commit content | PASS | Only pre-existing author email (intentional) present; all version strings read `0.2.5` |
-| ISC-249 | Commit not pushed without explicit confirmation | PENDING — will ask user before `git push` |
+| ISC-249 | Commit not pushed without explicit confirmation | PASS | User explicitly confirmed via AskUserQuestion before `git push origin main` was run |
+| ISC-236 | Remote plugin.json version = local | PASS | Post-push curl: remote `"version": "0.2.5"` = local |
+| ISC-237 | Remote SKILL.md byte-identical to local | PASS | Post-push curl + diff: exit 0, zero differences |
 | ISC-250/251 | CHANGELOG.md exists, README links it | PASS | CHANGELOG.md created 2026-07-14 covering 1.0→0.2.5; README.md new "Changelog" section |
 | ISC-252/253 | Full git-history secret/PII scan | PASS | `git log -p \| grep -iE "api.?key\|secret\|password\|BEGIN.*PRIVATE\|token"` and a path/IP pattern scan both returned zero true matches (only this ISA's own criterion text, a false-positive self-match) — added per commitment-boundary advisor call recommending a history scan before push, not just a working-tree scan |
