@@ -4,7 +4,7 @@ project: skill-eye
 effort: E3
 effort_source: context-override
 phase: verify
-progress: 26/29
+progress: 30/33
 mode: algorithm
 started: 2026-07-14T00:00:00Z
 updated: 2026-07-14T00:01:00Z
@@ -374,6 +374,10 @@ Given two prior live failures on `--update` (2026-07-01, both rating 3/10 — se
 - [x] ISC-247: Anti: this task's edits never renumber or delete any of ISC-1 through ISC-220
 - [x] ISC-248: Anti: no commit message or file content produced by this task claims a version number that doesn't match `plugin.json`
 - [DEFERRED-VERIFY] ISC-249: Anti: the finalize commit is not pushed to `origin/main` without explicit user confirmation
+- [x] ISC-250: `CHANGELOG.md` exists at repo root documenting version history including the 0.3.0→0.2.2 revert
+- [x] ISC-251: README.md links to `CHANGELOG.md`
+- [x] ISC-252: Anti: no secret, token, password, or private-key pattern found in full `git log -p` history (not just working tree)
+- [x] ISC-253: Anti: no personal filesystem path or internal IP found in full `git log -p` history
 
 ## Test Strategy
 
@@ -538,3 +542,5 @@ Outstanding: ISC-208/ISC-209 (README update) deferred — Forge noted README is 
 | ISC-247 | ISC-1..220 criterion text unchanged | PASS | `git diff` shows zero removed `- [ ] ISC-N:` bullet lines outside the 221–249 range |
 | ISC-242/248 | No secrets exposed; no version-number mismatch in commit content | PASS | Only pre-existing author email (intentional) present; all version strings read `0.2.5` |
 | ISC-249 | Commit not pushed without explicit confirmation | PENDING — will ask user before `git push` |
+| ISC-250/251 | CHANGELOG.md exists, README links it | PASS | CHANGELOG.md created 2026-07-14 covering 1.0→0.2.5; README.md new "Changelog" section |
+| ISC-252/253 | Full git-history secret/PII scan | PASS | `git log -p \| grep -iE "api.?key\|secret\|password\|BEGIN.*PRIVATE\|token"` and a path/IP pattern scan both returned zero true matches (only this ISA's own criterion text, a false-positive self-match) — added per commitment-boundary advisor call recommending a history scan before push, not just a working-tree scan |

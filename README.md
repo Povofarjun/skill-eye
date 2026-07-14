@@ -185,6 +185,10 @@ It then asks 2–3 targeted questions to fill remaining gaps. skill-eye's only n
 
 ---
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## License
 
 MIT © [povofarjun](https://github.com/povofarjun) — see [LICENSE](LICENSE).
