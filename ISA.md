@@ -4,7 +4,7 @@ project: skill-eye
 effort: E3
 effort_source: context-override
 phase: verify
-progress: 25/29
+progress: 26/29
 mode: algorithm
 started: 2026-07-14T00:00:00Z
 updated: 2026-07-14T00:01:00Z
@@ -359,7 +359,7 @@ Given two prior live failures on `--update` (2026-07-01, both rating 3/10 — se
 ### Release Readiness — Repo Hygiene (2026-07-14)
 
 - [x] ISC-240: `.gitignore` excludes the `${HOME}` stray-directory artifact
-- [DEFERRED-VERIFY] ISC-241: `git status` shows a clean working tree after this task's edits are committed
+- [x] ISC-241: `git status` shows a clean working tree after this task's edits are committed
 - [x] ISC-242: Anti: no tracked file exposes a credential, token, or secret (author contact email is expected/intentional, not a leak)
 
 ### Antecedent (Required — goal is experiential)
