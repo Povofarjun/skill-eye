@@ -1,13 +1,13 @@
 {
   "name": "skill-eye",
-  "description": "Agent-agnostic skill guardian (claude, codex, opencode, pi, grok) that evaluates any AI agent skill against your real workflow before you install it, and monitors the health of the skills you already have. Learns your actual day-to-day tasks, tears apart the candidate skill, and delivers a verdict: install as-is, modify then install, or skip — with specific changes to make.",
-  "version": "0.2.6",
+  "description": "Agent-agnostic skill guardian (claude, codex, opencode, pi, grok) that evaluates any AI agent skill against your real workflow before you install it, monitors the health of the skills you already have, and statically flags dangerous capability combinations (network + write access, unguarded destructive commands, credential access, indirect prompt-injection surface) before you trust a skill with real system access. Learns your actual day-to-day tasks, tears apart the candidate skill, and delivers a verdict: install as-is, modify then install, or skip — with specific changes to make.",
+  "version": "0.2.7",
   "author": {
     "name": "povofarjun",
     "email": "arjunpansheria@gmail.com",
     "url": "https://github.com/povofarjun"
   },
-  "keywords": ["skills", "evaluation", "guardian", "audit", "remove", "workflow", "review", "agent-agnostic", "inspect"],
+  "keywords": ["skills", "evaluation", "guardian", "audit", "remove", "workflow", "review", "agent-agnostic", "inspect", "security", "risk"],
   "homepage": "https://github.com/povofarjun/skill-eye",
   "license": "MIT"
 }

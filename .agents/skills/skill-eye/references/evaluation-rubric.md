@@ -156,6 +156,62 @@ When you spot these in the target skill, mention them in the "What this skill ac
 
 ---
 
+## Risk Assessment — Detailed Signals
+
+Reference for the Risk Assessment section (used by Phase 3, Phase 6, Phase 10). Read this when a
+signal match is ambiguous — the goal is to catch real capability surface without crying wolf on
+routine, well-guarded skills.
+
+**R1 exfil-surface (`Bash`/`Write`/`Edit` + a network tool in `allowed-tools`)**
+- Don't flag just because a skill fetches its *own* update (e.g. skill-eye's own `--update`
+  fetches from GitHub via Bash `curl` and writes locally) — that's the same signal by definition,
+  which is correct: it's disclosed and documented, not hidden. R1 is a *disclosure* flag, not a
+  verdict — plenty of legitimate skills trip it (anything that fetches a URL and saves the
+  result). What matters downstream is whether R1 combines with R3 or R4.
+- Do flag more heavily when the network tool's target is user-controlled/dynamic (e.g. "fetch the
+  URL the user pastes") rather than a fixed, single first-party endpoint.
+
+**R2 injection-surface (fetch remote content, then act on instructions found inside it)**
+- The tell is language like "follow the instructions in the fetched page", "execute what the
+  file says", or a skill that treats fetched content as anything beyond *data to summarize/
+  display*. A skill that fetches a SKILL.md and **evaluates** it (reads description, checks
+  tools) is fine — it's treating the content as data. A skill that fetches a webpage and then
+  says "do what it says" is the injection surface.
+- This is the only signal that alone forces `critical` — indirect prompt injection is the most
+  severe class because it lets a third party (whoever controls the fetched content) issue
+  instructions the user never wrote and never saw.
+
+**R3 unguarded-destructive (destructive op with no nearby confirm gate)**
+- Look for the gate textually near the destructive mention, not just anywhere in the file — a
+  global "we sometimes ask for confirmation" doesn't cover a specific `rm -rf` three sections
+  away with no local gate.
+- A destructive op inside a **template of what NOT to do**, or inside a code comment explaining a
+  past incident, is not a live capability — don't flag documentation-only mentions.
+- `--force` flags that explicitly *bypass* a stated confirmation are still fine if the
+  confirmation exists as the default path — the gate exists, force just skips it deliberately.
+
+**R4 credential-surface (reads/exports credential paths or secret-shaped strings)**
+- Distinguish "the skill's own `allowed-tools` justification text mentions `.env` as an example
+  of what it *doesn't* touch" (not a hit) from "the body actually greps/cats a credential path"
+  (a hit). Read the surrounding sentence, not just the keyword match.
+- A skill that reads `.env` to check whether a *variable name* is set (existence check) is a
+  lower-severity version of this than one that echoes or transmits the *value*.
+
+**R5 silent-trigger (model-invoked + write/exec power)**
+- This is the weakest signal on its own (`medium`) — plenty of legitimate model-invoked skills
+  need Bash for read-only inspection. It matters mainly in combination: a model-invoked skill
+  that's *also* R1 or R3 is materially riskier than a user-invoked one with the same body, because
+  the user never explicitly asked for it to run.
+
+**False-positive discipline:** when a signal match is a keyword appearing in prose/documentation
+about the skill rather than in an actual instruction to the agent, don't count it. When genuinely
+unsure whether a match is live instruction vs. discussion, note it as tripped but say so plainly
+in the signal reason (e.g. "R4: mentions `.env` — verify this is a live read, not documentation")
+rather than silently dropping it — false negatives are worse than a flagged line the user can
+dismiss in two seconds.
+
+---
+
 ## Modify-Then-Install: Writing Good Change Instructions
 
 When issuing Verdict B, the changes must be specific enough to copy-paste.

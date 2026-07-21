@@ -31,6 +31,7 @@ claims:   "review the current diff for correctness bugs and reuse/simplification
 fit_for:  developers who ship code frequently and want pre-push automated review
 needs:    Bash, Read, Glob, Grep (all standard)
 assumes:  git repo with uncommitted or staged changes present
+risk:     low — none detected
 ──────────────────────────────────────────────
 scores{trigger,tool,task,value}: 8,10,9,8
 fit: 8.8/10 · redundancy: NONE
@@ -49,7 +50,7 @@ next: /skill-eye verify                                                         
 Beyond one-off evaluation, `/skill-eye` with no arguments gives you a live health dashboard of everything installed:
 
 ```
-skill-eye v0.2.6 [agent: claude]
+skill-eye v0.2.7 [agent: claude]
 installed: 5 skills across 2 directories
 
 name              type    condition  last used    description
@@ -60,6 +61,8 @@ data-viz          model   healthy    never        chart/graph/dashboard design g
 old-linter        user    degraded   —            lints staged files (optional MCP missing)
 caveman           user    broken     30 days ago  writes commit messages in a dead style
 ──────────────────────────────────────────────────────────────
+⚠ risk: 1 installed skill(s) flagged high/critical — /skill-eye --audit   review
+
 usage: /skill-eye <skill-name|github-url|owner/repo> [--detailed]
        /skill-eye --inspect <name>   show skill anatomy
        /skill-eye --discover          recommend skills for your workflow
@@ -72,6 +75,27 @@ next: /skill-eye --inspect code-review   inspect a skill
 ```
 
 Every skill is tagged with a **working-condition badge** — `healthy` (all required tools available), `degraded` (an optional tool referenced in the body is missing), or `broken` (a declared dependency is unavailable) — computed via static analysis, never by executing the skill.
+
+---
+
+## Risk scoring — the part that makes this a guardian, not just a linter
+
+A skill is an unaudited text file that an agent trusts with real Bash, Write, and network access. Nothing else in the skills ecosystem tells you what that access actually adds up to before you install something. skill-eye does — statically, without ever running or fetching anything to check.
+
+Every evaluate, `--audit`, and `--inspect` run scores a skill's **capability surface** against five signals and rolls them into one badge:
+
+| Badge | Meaning |
+|-------|---------|
+| `critical` | fetches remote content and acts on instructions found inside it (indirect prompt injection) — or combines network access with credential access |
+| `high` | reads/exports credential paths (`.env`, `.ssh`, `id_rsa`, API keys) — or combines network access with an unguarded destructive command |
+| `medium` | one isolated signal: network+local-power tools together, an unguarded destructive command, or a model-invoked skill with write/exec power |
+| `low` | none of the above |
+
+This changes verdicts, not just labels: a candidate at `risk: critical` can never come back `INSTALL AS-IS`, no matter how good the fit score is — it's capped at `MODIFY THEN INSTALL` with a change that names the exact capability to gate or remove. At `risk: high`, `INSTALL AS-IS` is still possible but a `caution:` line is mandatory in the report, not optional.
+
+`--audit` surfaces this independently of whether a skill is active or dormant — a skill you use every day can still carry a risk you've never reviewed, and the audit's `flagged:` section calls those out regardless of usage. The default no-args dashboard stays quiet unless something needs your attention: it shows a one-line `⚠ risk:` warning only when an installed skill is `high` or `critical`.
+
+Every signal match is textual — a match in prose or documentation about the skill (not a live instruction to the agent) shouldn't count, and the rubric in `references/evaluation-rubric.md` documents that false-positive discipline signal by signal.
 
 ---
 
@@ -148,11 +172,11 @@ If your harness has no command history to learn from (only Claude Code's `~/.cla
 
 | Verdict | Fit Score | What you get |
 |---------|-----------|-------------|
-| `INSTALL AS-IS` | ≥ 7.0 | Benefits + usage tip + install command |
-| `MODIFY THEN INSTALL` | 4.0–6.9 | Exact copy-pasteable changes to make first |
+| `INSTALL AS-IS` | ≥ 7.0 (and risk < `critical`) | Benefits + usage tip + install command |
+| `MODIFY THEN INSTALL` | 4.0–6.9, or fit ≥ 7.0 with risk = `critical` | Exact copy-pasteable changes to make first |
 | `SKIP` | < 4.0 | Why it misses + what you'd actually need |
 
-Every response ends with `next:` lines — concrete commands to run, never a dead end.
+A `risk: critical` skill can never come back `INSTALL AS-IS` — see [Risk scoring](#risk-scoring--the-part-that-makes-this-a-guardian-not-just-a-linter) above. Every response ends with `next:` lines — concrete commands to run, never a dead end.
 
 ---
 
@@ -197,6 +221,8 @@ What that access is used for, concretely:
 - Evaluating a skill (by name, URL, or repo), `--discover`, and `--batch` fetch **public** GitHub content (the target skill's own SKILL.md) — never your prompts, files, or profile.
 
 None of this runs unattended: every destructive action shows you the path/command first and asks `confirm? (y/N)` unless you explicitly pass `--force`. If you want zero-trust, read `.agents/skills/skill-eye/SKILL.md` yourself before installing — it's plain-English instructions to an agent, not compiled code, so there's nothing hidden that isn't in that file.
+
+Risk Assessment (above) adds no new tool or network call of its own — it's a Grep pass over text skill-eye has already fetched or already has local access to. It's also a lens skill-eye turns on itself: skill-eye's own body uses `Bash` (for `curl` and `npx`) alongside no network-fetch *tool* — its GitHub reads go through `curl` inside `Bash`, which is why its `allowed-tools` list is `Bash, Read, Write, Edit, Glob, Grep` and nothing wider. Every destructive path (`--remove`, `--update`) is confirmation-gated by default, which is exactly the R3 guard the risk scorer checks for in other skills.
 
 ## Changelog
 
